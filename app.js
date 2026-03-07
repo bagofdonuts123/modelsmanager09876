@@ -210,9 +210,20 @@ function friendlyAuthError(code) {
 }
 
 /* =========================================
+   GRID HEIGHT — set directly in JS so no
+   CSS parent chain can ever override it
+========================================= */
+function fixGridHeight() {
+   const grid = document.getElementById("boxContainer");
+   if (grid) grid.style.height = (window.innerHeight - 60) + "px";
+}
+
+/* =========================================
    APP INIT (runs after login + data load)
 ========================================= */
 function initApp() {
+   fixGridHeight();
+   window.addEventListener("resize", fixGridHeight);
    if (state.categories.length > 0) {
       activeId = state.categories[0].id;
    } else {
