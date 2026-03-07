@@ -158,14 +158,14 @@ auth.onAuthStateChanged(async (user) => {
 
 function showLogin() {
    els.loadingScreen.classList.add("hidden");
-   els.appLayout.classList.add("hidden");
    els.loginScreen.classList.remove("hidden");
+   // layout stays in DOM always — login screen overlays it via position:fixed
 }
 
 function showApp() {
    els.loadingScreen.classList.add("hidden");
    els.loginScreen.classList.add("hidden");
-   els.appLayout.classList.remove("hidden");
+   // layout was always rendered — no display change needed, grid heights are correct
    initApp();
 }
 
