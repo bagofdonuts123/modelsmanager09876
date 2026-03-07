@@ -132,7 +132,6 @@ body {
 .layout {
    display: grid;
    grid-template-columns: 260px 1fr 340px;
-   grid-template-rows: 100vh; /* explicitly cap the single row — without this, auto row grows with content */
    height: 100vh;
    overflow: hidden;
 }
@@ -250,8 +249,9 @@ textarea:focus {
    border-right: 1px solid var(--border);
    display: flex;
    flex-direction: column;
+   height: 100vh;
    overflow-y: auto;
-   min-height: 0;
+   box-sizing: border-box;
 }
 
 .sidebar-header {
@@ -341,8 +341,9 @@ textarea:focus {
    background: var(--bg-dark);
    display: flex;
    flex-direction: column;
-   overflow: hidden; /* prevent the flex child from expanding beyond viewport */
-   min-height: 0;
+   height: 100vh;
+   overflow: hidden;
+   box-sizing: border-box;
 }
 
 .top-bar {
@@ -401,8 +402,8 @@ textarea:focus {
    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
    gap: 20px;
    align-content: start;
-   flex: 1;        /* fill remaining space in .main-content column */
-   min-height: 0;  /* critical: lets flex child shrink so overflow-y kicks in */
+   height: calc(100vh - 60px); /* 60px = top-bar height */
+   box-sizing: border-box;
 }
 
 .box-grid::-webkit-scrollbar { width: 8px; }
@@ -469,10 +470,11 @@ textarea:focus {
 .info-panel {
    background: var(--bg-panel);
    border-left: 1px solid var(--border);
+   height: 100vh;
    overflow-y: auto;
    display: flex;
    flex-direction: column;
-   min-height: 0;
+   box-sizing: border-box;
 }
 
 .empty-state {
