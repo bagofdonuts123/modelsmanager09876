@@ -225,6 +225,7 @@ function initApp() {
 
    document.getElementById("addCategoryBtn").onclick  = () => openPromptModal("New Category", "Name", (val) => createCategory(val));
    document.getElementById("addBoxBtn").onclick       = openAddBoxModal;
+   document.getElementById("bulkAddBoxBtn").onclick   = openBulkAddBoxModal;
    document.getElementById("settingsBtn").onclick     = openSettingsModal;
    document.getElementById("manageTagsBtn").onclick   = openTagManagerModal;
    document.getElementById("logoutBtn").onclick       = handleLogout;
@@ -404,6 +405,65 @@ async function handleAddBox(name) {
    const cat = state.categories.find(c => c.id === activeId);
    cat.boxes.push({ id: crypto.randomUUID(), name, image, tags: [], links: [] });
    save(); renderBoxes();
+}
+
+function openBulkAddBoxModal() {
+   if (!activeId || viewMode !== 'category') { alert("Select a category first."); return; }
+   els.modalTitle.innerText = "Bulk Add Models";
+   els.modalBody.innerHTML = `
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
+         One model name per line. Each will be looked up automatically.
+      </p>
+      <div class="form-group">
+         <label>Model Names</label>
+         <textarea id="bulkBoxInput" rows="12"
+            style="resize:vertical;font-family:monospace;font-size:13px;line-height:1.8;"
+            placeholder="judymiles&#10;islanomi&#10;somemodel"></textarea>
+      </div>
+      <div id="bulkBoxPreview" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
+   `;
+   els.modalOverlay.classList.remove("hidden");
+   els.modalConfirmBtn.classList.remove("hidden");
+   els.modalConfirmBtn.innerText = "Add Models";
+
+   const textarea = document.getElementById("bulkBoxInput");
+   const preview  = document.getElementById("bulkBoxPreview");
+
+   textarea.addEventListener("input", () => {
+      const names = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
+      preview.innerText = names.length ? `${names.length} model${names.length !== 1 ? "s" : ""} will be added.` : "";
+   });
+
+   els.modalConfirmBtn.onclick = async () => {
+      const names = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
+      if (!names.length) { closeModal(); return; }
+
+      els.modalConfirmBtn.disabled = true;
+      els.modalConfirmBtn.innerText = "Adding…";
+      document.getElementById("bulkBoxPreview").innerText = "Fetching images, please wait…";
+
+      await handleBulkAddBoxes(names);
+      closeModal();
+   };
+}
+
+async function handleBulkAddBoxes(names) {
+   const cat = state.categories.find(c => c.id === activeId);
+   if (!cat) return;
+
+   for (const name of names) {
+      let image = "";
+      try {
+         const res  = await fetch(`https://api.camgirlfinder.net/models/search?model=${encodeURIComponent(name)}`);
+         const json = await res.json();
+         if (json.length && json[0].persons?.[0]?.urls?.faceImage) image = json[0].persons[0].urls.faceImage;
+      } catch (e) { console.error("API Error for", name, e); }
+
+      cat.boxes.push({ id: crypto.randomUUID(), name, image, tags: [], links: [] });
+   }
+
+   save();
+   renderBoxes();
 }
 
 /* =========================================

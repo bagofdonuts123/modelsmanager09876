@@ -338,6 +338,8 @@ textarea:focus {
    background: var(--bg-dark);
    display: flex;
    flex-direction: column;
+   overflow: hidden; /* prevent the flex child from expanding beyond viewport */
+   min-height: 0;
 }
 
 .top-bar {
@@ -396,7 +398,8 @@ textarea:focus {
    grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
    gap: 20px;
    align-content: start;
-   height: calc(100vh - 60px);
+   flex: 1;        /* fill remaining space in .main-content column */
+   min-height: 0;  /* critical: lets flex child shrink so overflow-y kicks in */
 }
 
 .box-grid::-webkit-scrollbar { width: 8px; }
