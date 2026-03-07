@@ -132,7 +132,9 @@ body {
 .layout {
    display: grid;
    grid-template-columns: 260px 1fr 340px;
+   grid-template-rows: 100vh; /* explicitly cap the single row — without this, auto row grows with content */
    height: 100vh;
+   overflow: hidden;
 }
 
 /* Typography & Common */
@@ -249,6 +251,7 @@ textarea:focus {
    display: flex;
    flex-direction: column;
    overflow-y: auto;
+   min-height: 0;
 }
 
 .sidebar-header {
@@ -469,6 +472,7 @@ textarea:focus {
    overflow-y: auto;
    display: flex;
    flex-direction: column;
+   min-height: 0;
 }
 
 .empty-state {
