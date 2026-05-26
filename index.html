@@ -5,10 +5,10 @@
    <meta charset="UTF-8">
    <meta name="viewport" content="width=device-width, initial-scale=1.0">
    <title>Model Manager Pro</title>
+   <link rel="stylesheet" href="style.css">
    <link rel="preconnect" href="https://fonts.googleapis.com">
    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-   <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
-   <link rel="stylesheet" href="style.css">
+   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
    <script src="https://unpkg.com/@phosphor-icons/web"></script>
 
    <!-- Firebase SDK -->
@@ -19,7 +19,7 @@
 
 <body>
 
-   <!-- ── LOGIN SCREEN (position:fixed overlay, layout always in DOM) ── -->
+   <!-- ── LOGIN SCREEN ── -->
    <div id="loginScreen" class="login-screen">
       <div class="login-card">
          <div class="login-logo"><i class="ph ph-shield-check"></i></div>
@@ -45,7 +45,7 @@
       <i class="ph ph-circle-notch ph-spinner"></i>
    </div>
 
-   <!-- ── MAIN APP — never hidden so grid heights are always computed ── -->
+   <!-- ── MAIN APP ── -->
    <div class="layout">
       <aside class="sidebar">
          <div class="sidebar-header">
@@ -57,9 +57,9 @@
                <button id="logoutBtn" title="Sign Out" class="icon-btn"><i class="ph ph-sign-out"></i></button>
             </div>
          </div>
-         <div class="nav-section-title">CATEGORIES</div>
+         <div class="nav-section-title">Categories</div>
          <div id="categoryList" class="category-list"></div>
-         <div class="nav-section-title" style="margin-top: 20px;">TAGS</div>
+         <div class="nav-section-title" style="margin-top: 20px;">Tags</div>
          <div id="tagSidebarList" class="category-list"></div>
       </aside>
 
@@ -71,8 +71,8 @@
             </div>
             <div class="bar-right">
                <div class="search-wrapper">
-                  <i class="ph ph-magnifying-glass"></i>
                   <input type="text" id="searchInput" placeholder="Search models...">
+                  <i class="ph ph-magnifying-glass"></i>
                </div>
                <button id="bulkAddBoxBtn" class="btn ghost"><i class="ph ph-list-plus"></i> Bulk Add</button>
                <button id="addBoxBtn" class="btn primary"><i class="ph ph-plus"></i> Add Model</button>
@@ -95,7 +95,7 @@
       <div class="modal">
          <header class="modal-header">
             <h3 id="modalTitle">Title</h3>
-            <button class="close-modal"><i class="ph ph-x"></i></button>
+            <button class="close-modal icon-btn"><i class="ph ph-x"></i></button>
          </header>
          <div id="modalBody" class="modal-body"></div>
          <footer class="modal-footer">
@@ -107,4 +107,5 @@
 
    <script src="app.js"></script>
 </body>
+
 </html>
