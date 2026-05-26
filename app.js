@@ -92,7 +92,7 @@ function showSaveIndicator(status) {
    clearTimeout(indicatorHideTimer);
    indicatorEl.classList.add("visible");
    if (status === "saving") {
-      indicatorEl.innerHTML = `<i class="ph ph-circle-notch ph-spinner"></i> Saving...`;
+      indicatorEl.innerHTML = `<i class="ph ph-circle-notch ph-spinner"></i> Saving…`;
    } else if (status === "saved") {
       indicatorEl.innerHTML = `<i class="ph ph-check"></i> Saved`;
       indicatorHideTimer = setTimeout(() => indicatorEl.classList.remove("visible"), 2000);
@@ -146,6 +146,7 @@ auth.onAuthStateChanged(async (user) => {
    if (user) {
       currentUid = user.uid;
       await loadState();
+      // Hide overlays — layout was always in DOM so heights are correct
       els.loadingScreen.classList.add("hidden");
       els.loginScreen.classList.add("hidden");
       initApp();
@@ -168,7 +169,7 @@ async function handleLogin() {
    const password = els.loginPassword.value;
    if (!email || !password) { showLoginError("Please enter your email and password."); return; }
    els.loginBtn.disabled = true;
-   els.loginBtn.innerHTML = `<i class="ph ph-circle-notch ph-spinner"></i> Signing in...`;
+   els.loginBtn.innerHTML = `<i class="ph ph-circle-notch ph-spinner"></i> Signing in…`;
    hideLoginError();
    try {
       await auth.signInWithEmailAndPassword(email, password);
@@ -196,6 +197,7 @@ function friendlyAuthError(code) {
 
 /* =========================================
    INIT & LISTENERS
+   — identical to working version —
 ========================================= */
 function initApp() {
    if (state.categories.length > 0) {
@@ -288,7 +290,7 @@ function renderSidebar() {
       div.className = `category-item ${isActive ? "active" : ""}`;
       div.innerHTML = `
             <div style="display:flex; align-items:center;">
-                <div class="tag-dot" style="background:${tag.color}; color:${tag.color}"></div>
+                <div class="tag-dot" style="background:${tag.color}"></div>
                 <span>${tag.name}</span>
             </div>
         `;
@@ -444,16 +446,16 @@ function openBulkAddBoxModal() {
    if (!activeId || viewMode !== 'category') { alert("Select a category first."); return; }
    els.modalTitle.innerText = "Bulk Add Models";
    els.modalBody.innerHTML = `
-      <p style="font-size:12px;color:var(--text-muted);margin-bottom:16px;line-height:1.7;">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:14px;line-height:1.6;">
          One model name per line. Images will be fetched automatically.
       </p>
       <div class="form-group">
          <label>Model Names</label>
          <textarea id="bulkBoxInput" rows="12"
-            style="font-family:var(--font-mono);font-size:13px;line-height:1.8;"
+            style="font-family:monospace;font-size:13px;line-height:1.8;"
             placeholder="judymiles&#10;islanomi&#10;somemodel"></textarea>
       </div>
-      <div id="bulkBoxPreview" style="font-size:12px;color:var(--text-muted);margin-top:8px;"></div>
+      <div id="bulkBoxPreview" style="font-size:11px;color:var(--text-muted);margin-top:6px;"></div>
    `;
    els.modalOverlay.classList.remove("hidden");
    els.modalConfirmBtn.classList.remove("hidden");
@@ -471,8 +473,8 @@ function openBulkAddBoxModal() {
       const names = textarea.value.split("\n").map(l => l.trim()).filter(Boolean);
       if (!names.length) { closeModal(); return; }
       els.modalConfirmBtn.disabled = true;
-      els.modalConfirmBtn.innerText = "Adding...";
-      preview.innerText = "Fetching images, please wait...";
+      els.modalConfirmBtn.innerText = "Adding…";
+      preview.innerText = "Fetching images, please wait…";
       await handleBulkAddBoxes(names);
       closeModal();
    };
@@ -557,11 +559,11 @@ function renderInfo() {
         <div class="info-header">
             <div>
                 <h2 style="margin-bottom:4px;">${box.name}</h2>
-                <div style="font-size:12px; color:var(--text-muted); font-weight:500;">in ${parentCat.name}</div>
+                <div style="font-size:12px; color:var(--text-muted)">in ${parentCat.name}</div>
             </div>
-            <div style="display:flex; gap:4px;">
-                <button class="icon-btn" onclick="openPromptModal('Edit Image URL', 'URL', (u) => updateBoxImage(u), '${box.image}')" title="Edit image"><i class="ph ph-image"></i></button>
-                <button class="icon-btn" style="color:var(--danger)" onclick="deleteBox()" title="Delete model"><i class="ph ph-trash"></i></button>
+            <div style="display:flex; gap:5px;">
+                <button class="icon-btn" onclick="openPromptModal('Edit Image URL', 'URL', (u) => updateBoxImage(u), '${box.image}')"><i class="ph ph-image"></i></button>
+                <button class="icon-btn" style="color:var(--danger)" onclick="deleteBox()"><i class="ph ph-trash"></i></button>
             </div>
         </div>
 
@@ -573,22 +575,22 @@ function renderInfo() {
                   return `<div class="tag-pill" style="background:${t.color}">${t.name} <i class="ph ph-x" onclick="removeTagFromBox('${tid}')"></i></div>`;
                }).join('')}
             </div>
-            <div style="display:flex; gap:6px; margin-top:10px;">
+            <div style="display:flex; gap:5px; margin-top:8px;">
                 <select id="addTagSelect" style="flex:1;">
                     <option value="">Select tag...</option>
                     ${availableTags.map(t => `<option value="${t.id}">${t.name}</option>`).join('')}
                 </select>
                 <button class="btn primary small" onclick="addTagToBox()">Add</button>
             </div>
-            <div style="margin-top:8px; text-align:right;">
-                 <a href="#" style="font-size:11px; color:var(--text-muted); text-decoration:none; transition:color 0.2s;" onmouseover="this.style.color='var(--primary-hover)'" onmouseout="this.style.color='var(--text-muted)'" onclick="openTagManagerModal()">Manage Global Tags</a>
+            <div style="margin-top:5px; text-align:right;">
+                 <a href="#" style="font-size:11px; color:var(--text-muted);" onclick="openTagManagerModal()">Manage Global Tags</a>
             </div>
         </div>
 
         <div class="section">
             <div class="section-title" style="display:flex; justify-content:space-between; align-items:center;">
                 <span>Custom Links</span>
-                <button class="btn small ghost" style="font-size:11px; padding:3px 10px;" onclick="openBulkAddLinksModal()">
+                <button class="btn small ghost" style="font-size:11px; padding:2px 8px;" onclick="openBulkAddLinksModal()">
                     <i class="ph ph-list-bullets"></i> Bulk Add
                 </button>
             </div>
@@ -599,12 +601,12 @@ function renderInfo() {
                   return `
                     <div class="link-item">
                         <i class="ph ph-globe"></i>
-                        <a href="${norm.url}" target="_blank" style="color:var(--text-main); text-decoration:none; flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${norm.url}">${label}</a>
+                        <a href="${norm.url}" target="_blank" style="color:white; text-decoration:none; flex:1; overflow:hidden; text-overflow:ellipsis;" title="${norm.url}">${label}</a>
                         <i class="ph ph-x del-link" onclick="removeLink(${i})"></i>
                     </div>`;
                }).join('')}
             </div>
-            <div style="display:flex; gap:6px; margin-top:12px;">
+            <div style="display:flex; gap:5px; margin-top:10px;">
                 <input id="newLinkTitle" placeholder="Label (optional)" style="width:35%;">
                 <input id="newLinkInput" placeholder="https://..." onkeypress="if(event.key==='Enter') addLink()">
                 <button class="btn primary small" onclick="addLink()">Add</button>
@@ -715,18 +717,18 @@ function parseBulkLines(text) {
 function openBulkAddLinksModal() {
    els.modalTitle.innerText = "Bulk Add Links";
    els.modalBody.innerHTML = `
-        <p style="font-size:12px; color:var(--text-muted); margin-bottom:16px; line-height:1.7;">
+        <p style="font-size:12px; color:var(--text-muted); margin-bottom:14px; line-height:1.6;">
             One entry per line. Two formats supported:<br>
-            <code style="background:var(--bg-card); padding:3px 8px; border-radius:4px; font-size:11px; border:1px solid var(--border-subtle); font-family:var(--font-mono);">Label, https://example.com</code> — with a custom label<br>
-            <code style="background:var(--bg-card); padding:3px 8px; border-radius:4px; font-size:11px; border:1px solid var(--border-subtle); font-family:var(--font-mono);">https://example.com</code> — URL only
+            <code style="background:var(--bg-card); padding:2px 6px; border-radius:4px; font-size:11px;">Label, https://example.com</code> — with a custom label<br>
+            <code style="background:var(--bg-card); padding:2px 6px; border-radius:4px; font-size:11px;">https://example.com</code> — URL only
         </p>
         <div class="form-group">
             <label>Links</label>
             <textarea id="bulkLinksInput" rows="12"
-                style="font-family:var(--font-mono); font-size:12px; line-height:1.7;"
+                style="font-family:monospace; font-size:12px; line-height:1.6;"
                 placeholder="My Site, https://example.com&#10;https://another.com&#10;Docs, https://docs.example.com"></textarea>
         </div>
-        <div id="bulkPreview" style="font-size:12px; color:var(--text-muted); margin-top:8px;"></div>
+        <div id="bulkPreview" style="font-size:11px; color:var(--text-muted); margin-top:6px;"></div>
     `;
    els.modalOverlay.classList.remove("hidden");
    els.modalConfirmBtn.classList.remove("hidden");
@@ -761,9 +763,9 @@ function openBulkAddLinksModal() {
 function openTagManagerModal() {
    els.modalTitle.innerText = "Manage Global Tags";
    els.modalBody.innerHTML = `
-        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 12px; line-height:1.6;">Drag the handles to reorder tags.</p>
+        <p style="font-size: 11px; color: var(--text-muted); margin-bottom: 10px;">Drag the handles (::) to reorder tags.</p>
         <div id="tagManagerList"></div>
-        <div style="display:grid; grid-template-columns: 1fr 40px 60px; gap:10px; margin-top:20px; padding-top:16px; border-top:1px solid var(--border-subtle);">
+        <div style="display:grid; grid-template-columns: 1fr 40px 60px; gap:10px; margin-top:20px; padding-top:15px; border-top:1px solid var(--border);">
             <input id="newTagName" placeholder="New Tag Name">
             <input type="color" id="newTagColor" value="#6366f1">
             <button class="btn primary small" id="addNewTagBtn">Add</button>
@@ -864,7 +866,7 @@ function openPromptModal(title, label, callback, defaultValue = "") {
 
 function openConfirmModal(title, message, callback) {
    els.modalTitle.innerText = title;
-   els.modalBody.innerHTML = `<p style="color:var(--text-muted); line-height:1.6;">${message}</p>`;
+   els.modalBody.innerHTML = `<p style="color:var(--text-muted)">${message}</p>`;
    els.modalOverlay.classList.remove("hidden");
    els.modalConfirmBtn.onclick = () => { callback(); closeModal(); };
 }
@@ -877,19 +879,19 @@ function openAddBoxModal() {
 function openSettingsModal() {
    els.modalTitle.innerText = "Settings";
    const templatesHtml = (state.settings.searchTemplates || []).map((t, i) => `
-        <div style="display:flex; gap:10px; margin-bottom:8px; align-items:center;">
-            <input value="${t.name}" id="tmpl-name-${i}" style="width:30%" placeholder="Name">
-            <input value="${t.url}" id="tmpl-url-${i}" placeholder="URL template">
-            <button class="icon-btn" onclick="removeTemplate(${i})" title="Remove"><i class="ph ph-trash"></i></button>
+        <div style="display:flex; gap:10px; margin-bottom:10px;">
+            <input value="${t.name}" id="tmpl-name-${i}" style="width:30%">
+            <input value="${t.url}" id="tmpl-url-${i}">
+            <button class="icon-btn" onclick="removeTemplate(${i})"><i class="ph ph-trash"></i></button>
         </div>
     `).join('');
    els.modalBody.innerHTML = `
         <div class="settings-section">
             <h3>Search Templates</h3>
             <div id="templateList">${templatesHtml}</div>
-            <button class="btn small primary" id="addTmplBtn" style="margin-top:12px"><i class="ph ph-plus"></i> Add Template</button>
+            <button class="btn small primary" id="addTmplBtn" style="margin-top:10px"><i class="ph ph-plus"></i> Add Template</button>
         </div>
-        <div class="settings-section" style="border-bottom:none; padding-bottom:0;">
+        <div class="settings-section">
             <h3>Data</h3>
             <div style="display:flex; gap:10px;">
                 <button class="btn" onclick="exportData()"><i class="ph ph-download"></i> Export</button>
