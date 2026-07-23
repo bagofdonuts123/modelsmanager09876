@@ -144,6 +144,9 @@ function SettingsModal({ closeModal }) {
   const [templates, setTemplates] = useState([...(state.settings?.searchTemplates || [])]);
   const [icons, setIcons] = useState([...(state.settings?.iconLibrary || [])]);
   const [newIconUrl, setNewIconUrl] = useState('');
+  const [showCategorySeparators, setShowCategorySeparators] = useState(
+    Boolean(state.settings?.showCategorySeparators)
+  );
 
   const handleSave = () => {
     const newState = {
@@ -151,7 +154,8 @@ function SettingsModal({ closeModal }) {
       settings: {
         ...(state.settings || {}),
         searchTemplates: templates.filter(t => t.name.trim() && t.url.trim()),
-        iconLibrary: icons
+        iconLibrary: icons,
+        showCategorySeparators
       }
     };
     save(newState);
@@ -219,6 +223,17 @@ function SettingsModal({ closeModal }) {
              <button class="btn ${theme === 'system' ? 'primary' : 'secondary'}" onClick=${() => setTheme('system')}><i class="ph ph-monitor"></i> System</button>
           </div>
         </div>
+        <label class="checkbox-label separator-option">
+          <input
+            type="checkbox"
+            checked=${showCategorySeparators}
+            onChange=${e => setShowCategorySeparators(e.target.checked)}
+          />
+          <span>
+            <strong>Category separation lines</strong>
+            <small>Add a subtle divider between sidebar categories.</small>
+          </span>
+        </label>
       </div>
 
       <div class="settings-section">
@@ -254,7 +269,7 @@ function SettingsModal({ closeModal }) {
         <div class="icon-grid">
            ${icons.map((ic, idx) => html`
              <div class="icon-item">
-                <img src=${ic.url} alt="icon" style=${{ width: '32px', height: '32px', objectFit: 'contain' }} />
+                <img class="model-icon" src=${ic.url} alt="icon" style=${{ width: '32px', height: '32px', objectFit: 'contain' }} />
                 <button class="icon-btn danger small" onClick=${() => {
                    const newIcons = [...icons];
                    newIcons.splice(idx, 1);

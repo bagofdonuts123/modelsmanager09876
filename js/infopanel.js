@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback } from './lib.js';
-import { useAppState, findBox, getTagObj, normalizeLink, updateBox, getActiveName, getActiveIcon } from './store.js';
+import { useAppState, findBox, getTagObj, normalizeLink, updateBox, getActiveName, getActiveIcon, getContrastTextColor } from './store.js';
 
 export function InfoPanel() {
   const { state, save, selectedBoxId, setSelectedBoxId, openModal } = useAppState();
@@ -37,14 +37,35 @@ export function InfoPanel() {
       const newName = nameEditValue.trim();
       const newHistory = [...(box.nameHistory || [])];
       
-      if (!newHistory.find(h => h.name === oldName)) {
-        newHistory.push({ name: oldName, tag: '' });
+      const oldEntryIndex = newHistory.findIndex(h => h.name === oldName);
+      const oldWasActive = getActiveName(box) === oldName;
+
+      if (oldEntryIndex === -1) {
+        newHistory.push({ name: oldName, state: 'stopped', active: false });
+      } else if (newHistory[oldEntryIndex].state === 'active') {
+        newHistory[oldEntryIndex] = {
+          ...newHistory[oldEntryIndex],
+          state: 'running',
+          active: false
+        };
+      }
+
+      if (oldWasActive) {
+        for (let index = 0; index < newHistory.length; index += 1) {
+          newHistory[index] = { ...newHistory[index], active: false };
+        }
+        const newEntryIndex = newHistory.findIndex(h => h.name === newName);
+        if (newEntryIndex >= 0) {
+          newHistory[newEntryIndex] = { ...newHistory[newEntryIndex], active: true };
+        } else {
+          newHistory.push({ name: newName, state: 'running', active: true });
+        }
       }
       
       const newState = updateBox(state, box.id, b => ({
         ...b,
         name: newName,
-        activeName: newName,
+        activeName: oldWasActive ? newName : (b.activeName || b.name),
         nameHistory: newHistory
       }));
       save(newState);
@@ -99,7 +120,7 @@ export function InfoPanel() {
               />
             ` : html`
               <h2 style=${{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                ${getActiveIcon(state.settings, box) ? html`<img src=${getActiveIcon(state.settings, box).url} style=${{ width: '24px', height: '24px', objectFit: 'contain' }} />` : null}
+                ${getActiveIcon(state.settings, box) ? html`<img class="model-icon" src=${getActiveIcon(state.settings, box).url} alt="" style=${{ width: '24px', height: '24px', objectFit: 'contain' }} />` : null}
                 ${box.name}
               </h2>
               <button class="icon-btn" onClick=${startEditName} title="Edit Name">
@@ -124,7 +145,7 @@ export function InfoPanel() {
       </div>
       
       <div class="panel-section">
-        <${ModelNameManager} box=${box} state=${state} save=${save} />
+        <${TagsManager} box=${box} state=${state} save=${save} openModal=${openModal} />
       </div>
       
       <div class="panel-section">
@@ -146,7 +167,7 @@ function IconPicker({ selectedId, icons, onChange }) {
   return html`
     <div class="icon-picker" style=${{ position: 'relative', display: 'flex', alignItems: 'center' }}>
       <button class="icon-btn small" onClick=${() => setIsOpen(!isOpen)} title="Pick Icon" style=${{ padding: '2px' }}>
-        ${selectedUrl ? html`<img src=${selectedUrl} style=${{ width: '20px', height: '20px', objectFit: 'contain' }} />` : html`<i class="ph ph-image"></i>`}
+        ${selectedUrl ? html`<img class="model-icon" src=${selectedUrl} alt="" style=${{ width: '20px', height: '20px', objectFit: 'contain' }} />` : html`<i class="ph ph-image"></i>`}
       </button>
       ${isOpen && html`
         <div class="icon-picker-dropdown" style=${{ 
@@ -159,7 +180,9 @@ function IconPicker({ selectedId, icons, onChange }) {
           </div>
           ${icons.map(ic => html`
             <img 
+              class="model-icon"
               src=${ic.url} 
+              alt=""
               onClick=${() => { onChange(ic.id); setIsOpen(false); }}
               style=${{ width: '24px', height: '24px', objectFit: 'contain', cursor: 'pointer', border: '1px solid var(--border)', borderRadius: '4px' }}
             />
@@ -174,22 +197,34 @@ function ModelNameManager({ box, state, save }) {
   const activeName = getActiveName(box);
   const history = box.nameHistory || [];
   const icons = state.settings?.iconLibrary || [];
+  const hasExplicitActive = history.some(h => h.active === true || h.state === 'active');
+
+  const getOperationalState = entry => {
+    if (entry?.state === 'running' || entry?.state === 'active') return 'running';
+    return 'stopped';
+  };
   
-  const allNames = [{ name: box.name, state: history.find(h => h.name === box.name)?.state || 'stopped', iconId: history.find(h => h.name === box.name)?.iconId, isCurrent: true }];
+  const currentHistoryEntry = history.find(h => h.name === box.name);
+  const allNames = [{
+    name: box.name,
+    state: getOperationalState(currentHistoryEntry),
+    active: currentHistoryEntry?.active === true || currentHistoryEntry?.state === 'active',
+    iconId: currentHistoryEntry?.iconId,
+    isCurrent: true
+  }];
   history.forEach(h => {
     if (h.name !== box.name) {
-      allNames.push({ ...h, isCurrent: false });
+      allNames.push({ ...h, state: getOperationalState(h), isCurrent: false });
     }
   });
 
   const updateHistory = (nameToUpdate, updates) => {
-    const newHistory = [...(box.nameHistory || [])];
-    const existingIdx = newHistory.findIndex(h => h.name === nameToUpdate);
-    
-    // If setting active, unset active from others
-    if (updates.state === 'active') {
-       newHistory.forEach(h => { if (h.state === 'active') h.state = 'stopped'; });
-    }
+    let newHistory = (box.nameHistory || []).map(h => ({
+      ...h,
+      state: getOperationalState(h),
+      active: h.active === true || h.state === 'active'
+    }));
+    let existingIdx = newHistory.findIndex(h => h.name === nameToUpdate);
 
     if (existingIdx >= 0) {
       newHistory[existingIdx] = { ...newHistory[existingIdx], ...updates };
@@ -197,10 +232,29 @@ function ModelNameManager({ box, state, save }) {
       newHistory.push({ name: nameToUpdate, ...updates });
     }
     
-    let activeNameStr = box.activeName;
-    if (updates.state === 'active') activeNameStr = nameToUpdate;
+    const newState = updateBox(state, box.id, b => ({ ...b, nameHistory: newHistory }));
+    save(newState);
+  };
 
-    const newState = updateBox(state, box.id, b => ({ ...b, nameHistory: newHistory, activeName: activeNameStr }));
+  const setActiveName = (nameToActivate) => {
+    let newHistory = (box.nameHistory || []).map(h => ({
+      ...h,
+      state: getOperationalState(h),
+      active: false
+    }));
+    const existingIdx = newHistory.findIndex(h => h.name === nameToActivate);
+
+    if (existingIdx >= 0) {
+      newHistory[existingIdx] = { ...newHistory[existingIdx], active: true };
+    } else {
+      newHistory.push({ name: nameToActivate, state: 'stopped', active: true });
+    }
+
+    const newState = updateBox(state, box.id, b => ({
+      ...b,
+      nameHistory: newHistory,
+      activeName: nameToActivate
+    }));
     save(newState);
   };
 
@@ -209,9 +263,13 @@ function ModelNameManager({ box, state, save }) {
       <h3>Name History</h3>
       <div class="name-list">
         ${allNames.map(entry => {
-          const isActuallyActive = entry.state === 'active' || (activeName === entry.name && !allNames.some(n => n.state === 'active'));
+          const isActuallyActive =
+            entry.active === true ||
+            entry.state === 'active' ||
+            (!hasExplicitActive && activeName === entry.name);
+          const operationalState = getOperationalState(entry);
           return html`
-            <div class="name-entry" style=${{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+            <div class="name-entry ${isActuallyActive ? 'is-active' : ''}">
               <${IconPicker} 
                 selectedId=${entry.iconId} 
                 icons=${icons} 
@@ -219,15 +277,26 @@ function ModelNameManager({ box, state, save }) {
               />
               <span class="name-text" style=${{ flex: 1 }}>${entry.name}</span>
               <select 
-                class="name-state-select"
-                value=${isActuallyActive ? 'active' : (entry.state || 'stopped')}
+                class="name-state-select state-${operationalState}"
+                value=${operationalState}
                 onChange=${e => updateHistory(entry.name, { state: e.target.value })}
-                style=${{ width: 'auto', padding: '2px 6px', fontSize: '11px', borderRadius: '4px' }}
+                aria-label=${`State for ${entry.name}`}
               >
-                <option value="active">Active</option>
                 <option value="running">Running</option>
                 <option value="stopped">Stopped</option>
               </select>
+              <button
+                type="button"
+                class="active-toggle ${isActuallyActive ? 'is-on' : ''}"
+                role="switch"
+                aria-checked=${isActuallyActive}
+                aria-label=${`${isActuallyActive ? 'Active' : 'Use'} ${entry.name} for display and URL templates`}
+                title=${isActuallyActive ? 'Used for display and URL templates' : 'Use for display and URL templates'}
+                onClick=${() => !isActuallyActive && setActiveName(entry.name)}
+              >
+                <span class="active-toggle-track"><span></span></span>
+                <span>Active</span>
+              </button>
             </div>
           `;
         })}
@@ -272,7 +341,10 @@ function TagsManager({ box, state, save, openModal }) {
           const tagObj = getTagObj(state, tagId);
           if (!tagObj) return null;
           return html`
-            <span class="tag-pill" style=${{ backgroundColor: tagObj.color }}>
+            <span
+              class="tag-pill"
+              style=${{ backgroundColor: tagObj.color, color: getContrastTextColor(tagObj.color) }}
+            >
               ${tagObj.name}
               <button class="remove-tag" onClick=${() => removeTag(tagId)}><i class="ph ph-x"></i></button>
             </span>

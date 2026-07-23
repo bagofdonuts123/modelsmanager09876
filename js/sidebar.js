@@ -176,7 +176,7 @@ export function Sidebar() {
 
       <div class="sidebar-section">
         <h3 class="section-title">CATEGORIES</h3>
-        <ul class="category-list">
+        <ul class="category-list ${state.settings?.showCategorySeparators ? 'show-separators' : ''}">
           ${(state.categories || []).map((category, index) => html`
             <li 
               key=${category.id}

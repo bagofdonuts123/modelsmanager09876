@@ -231,10 +231,10 @@ export function updateBox(state, boxId, updater) {
    };
 }
 
-/** Get the active name for URL templates (checks nameHistory for 'active' state, falls back to box.activeName or box.name) */
+/** Get the name used for cards and URL templates. Supports the legacy state: 'active' format. */
 export function getActiveName(box) {
    const history = box.nameHistory || [];
-   const activeEntry = history.find(h => h.state === 'active');
+   const activeEntry = history.find(h => h.active === true || h.state === 'active');
    if (activeEntry) return activeEntry.name;
    return box.activeName || box.name;
 }
@@ -242,12 +242,24 @@ export function getActiveName(box) {
 /** Get the icon object for the active name, or null */
 export function getActiveIcon(settings, box) {
    const history = box.nameHistory || [];
-   const activeEntry = history.find(h => h.state === 'active');
+   const activeName = getActiveName(box);
+   const activeEntry = history.find(h => h.name === activeName);
    if (activeEntry && activeEntry.iconId) {
       const icons = settings?.iconLibrary || [];
       return icons.find(i => i.id === activeEntry.iconId) || null;
    }
    return null;
+}
+
+/** Pick legible black or white text for a colored pill. */
+export function getContrastTextColor(color) {
+   const hex = String(color || '').trim().replace('#', '');
+   if (!/^[0-9a-f]{6}$/i.test(hex)) return '#ffffff';
+   const r = parseInt(hex.slice(0, 2), 16);
+   const g = parseInt(hex.slice(2, 4), 16);
+   const b = parseInt(hex.slice(4, 6), 16);
+   const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+   return luminance > 0.62 ? '#111111' : '#ffffff';
 }
 
 /** Parse bulk link lines into { title, url } objects */

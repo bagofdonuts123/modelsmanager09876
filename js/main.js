@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback, memo } from './lib.js';
-import { useAppState, getTagObj, getActiveName, getActiveIcon } from './store.js';
+import { useAppState, getTagObj, getActiveName, getActiveIcon, getContrastTextColor } from './store.js';
 import { dragSource, setDragSource } from './sidebar.js';
 
 export function TopBar() {
@@ -142,13 +142,18 @@ export const BoxCard = memo(function BoxCard({ box, categoryId }) {
       />
       <div class="box-info">
         <h3 style=${{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-          ${activeIcon ? html`<img src=${activeIcon.url} style=${{ width: '16px', height: '16px', objectFit: 'contain' }} />` : null}
+          ${activeIcon ? html`<img class="model-icon" src=${activeIcon.url} alt="" style=${{ width: '16px', height: '16px', objectFit: 'contain' }} />` : null}
           ${activeName}
         </h3>
         <div class="card-tags-text">
           ${(box.tags || []).map(tagId => {
             const tag = getTagObj(state, tagId);
-            return tag ? html`<span class="card-tag-label" style=${{ color: tag.color }}>${tag.name}</span> ` : null;
+            return tag ? html`
+              <span
+                class="card-tag-label"
+                style=${{ backgroundColor: tag.color, color: getContrastTextColor(tag.color) }}
+              >${tag.name}</span>
+            ` : null;
           })}
         </div>
       </div>
