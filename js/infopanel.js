@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback } from './lib.js';
-import { useAppState, findBox, getTagObj, normalizeLink, updateBox, getActiveName } from './store.js';
+import { useAppState, findBox, getTagObj, normalizeLink, updateBox, getActiveName, getActiveIcon } from './store.js';
 
 export function InfoPanel() {
   const { state, save, selectedBoxId, setSelectedBoxId, openModal } = useAppState();
@@ -98,7 +98,10 @@ export function InfoPanel() {
                 autoFocus
               />
             ` : html`
-              <h2>${box.name}</h2>
+              <h2 style=${{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                ${getActiveIcon(state.settings, box) ? html`<img src=${getActiveIcon(state.settings, box).url} style=${{ width: '24px', height: '24px', objectFit: 'contain' }} />` : null}
+                ${box.name}
+              </h2>
               <button class="icon-btn" onClick=${startEditName} title="Edit Name">
                 <i class="ph ph-pencil-simple"></i>
               </button>
@@ -121,7 +124,7 @@ export function InfoPanel() {
       </div>
       
       <div class="panel-section">
-        <${TagsManager} box=${box} state=${state} save=${save} openModal=${openModal} />
+        <${ModelNameManager} box=${box} state=${state} save=${save} />
       </div>
       
       <div class="panel-section">
@@ -135,33 +138,69 @@ export function InfoPanel() {
   `;
 }
 
+function IconPicker({ selectedId, icons, onChange }) {
+  const [isOpen, setIsOpen] = useState(false);
+  const selectedIcon = icons.find(i => i.id === selectedId);
+  const selectedUrl = selectedIcon ? selectedIcon.url : '';
+
+  return html`
+    <div class="icon-picker" style=${{ position: 'relative', display: 'flex', alignItems: 'center' }}>
+      <button class="icon-btn small" onClick=${() => setIsOpen(!isOpen)} title="Pick Icon" style=${{ padding: '2px' }}>
+        ${selectedUrl ? html`<img src=${selectedUrl} style=${{ width: '20px', height: '20px', objectFit: 'contain' }} />` : html`<i class="ph ph-image"></i>`}
+      </button>
+      ${isOpen && html`
+        <div class="icon-picker-dropdown" style=${{ 
+            position: 'absolute', top: '100%', left: 0, zIndex: 10, background: 'var(--bg-panel)', 
+            border: '1px solid var(--border)', borderRadius: '6px', padding: '6px', 
+            display: 'flex', gap: '4px', flexWrap: 'wrap', width: '120px', boxShadow: 'var(--shadow)' 
+          }}>
+          <div onClick=${() => { onChange(''); setIsOpen(false); }} style=${{ width: '24px', height: '24px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: '1px dashed var(--border)', borderRadius: '4px' }}>
+            <i class="ph ph-prohibit"></i>
+          </div>
+          ${icons.map(ic => html`
+            <img 
+              src=${ic.url} 
+              onClick=${() => { onChange(ic.id); setIsOpen(false); }}
+              style=${{ width: '24px', height: '24px', objectFit: 'contain', cursor: 'pointer', border: '1px solid var(--border)', borderRadius: '4px' }}
+            />
+          `)}
+        </div>
+      `}
+    </div>
+  `;
+}
+
 function ModelNameManager({ box, state, save }) {
   const activeName = getActiveName(box);
   const history = box.nameHistory || [];
+  const icons = state.settings?.iconLibrary || [];
   
-  const allNames = [{ name: box.name, tag: '', isCurrent: true }];
+  const allNames = [{ name: box.name, state: history.find(h => h.name === box.name)?.state || 'stopped', iconId: history.find(h => h.name === box.name)?.iconId, isCurrent: true }];
   history.forEach(h => {
     if (h.name !== box.name) {
       allNames.push({ ...h, isCurrent: false });
     }
   });
 
-  const setAsActive = (nameToSet) => {
-    const newState = updateBox(state, box.id, b => ({ ...b, activeName: nameToSet }));
-    save(newState);
-  };
-
-  const updateHistoryTag = (nameToUpdate, newTag) => {
+  const updateHistory = (nameToUpdate, updates) => {
     const newHistory = [...(box.nameHistory || [])];
     const existingIdx = newHistory.findIndex(h => h.name === nameToUpdate);
     
+    // If setting active, unset active from others
+    if (updates.state === 'active') {
+       newHistory.forEach(h => { if (h.state === 'active') h.state = 'stopped'; });
+    }
+
     if (existingIdx >= 0) {
-      newHistory[existingIdx] = { ...newHistory[existingIdx], tag: newTag };
+      newHistory[existingIdx] = { ...newHistory[existingIdx], ...updates };
     } else {
-      newHistory.push({ name: nameToUpdate, tag: newTag });
+      newHistory.push({ name: nameToUpdate, ...updates });
     }
     
-    const newState = updateBox(state, box.id, b => ({ ...b, nameHistory: newHistory }));
+    let activeNameStr = box.activeName;
+    if (updates.state === 'active') activeNameStr = nameToUpdate;
+
+    const newState = updateBox(state, box.id, b => ({ ...b, nameHistory: newHistory, activeName: activeNameStr }));
     save(newState);
   };
 
@@ -170,22 +209,25 @@ function ModelNameManager({ box, state, save }) {
       <h3>Name History</h3>
       <div class="name-list">
         ${allNames.map(entry => {
-          const isActuallyActive = entry.name === activeName;
+          const isActuallyActive = entry.state === 'active' || (activeName === entry.name && !allNames.some(n => n.state === 'active'));
           return html`
-            <div class="name-entry">
-              <span class="name-text">${entry.name}</span>
-              <input 
-                class="name-tag-input"
-                type="text" 
-                placeholder="tag (e.g. twitter)" 
-                value=${entry.tag || ''}
-                onBlur=${e => updateHistoryTag(entry.name, e.target.value)}
+            <div class="name-entry" style=${{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+              <${IconPicker} 
+                selectedId=${entry.iconId} 
+                icons=${icons} 
+                onChange=${id => updateHistory(entry.name, { iconId: id })} 
               />
-              ${isActuallyActive ? html`
-                <span class="badge active-badge">ACTIVE</span>
-              ` : html`
-                <button class="btn small" onClick=${() => setAsActive(entry.name)}>Set Active</button>
-              `}
+              <span class="name-text" style=${{ flex: 1 }}>${entry.name}</span>
+              <select 
+                class="name-state-select"
+                value=${isActuallyActive ? 'active' : (entry.state || 'stopped')}
+                onChange=${e => updateHistory(entry.name, { state: e.target.value })}
+                style=${{ width: 'auto', padding: '2px 6px', fontSize: '11px', borderRadius: '4px' }}
+              >
+                <option value="active">Active</option>
+                <option value="running">Running</option>
+                <option value="stopped">Stopped</option>
+              </select>
             </div>
           `;
         })}
@@ -263,6 +305,22 @@ function LinksManager({ box, state, save, openModal }) {
     save(newState);
   };
 
+  const editLink = (index) => {
+    const link = links[index];
+    openModal('editLink', {
+      title: link.title,
+      url: link.url,
+      onConfirm: (newLink) => {
+        const newState = updateBox(state, box.id, b => {
+          const newLinks = [...(b.links || [])];
+          newLinks[index] = normalizeLink(newLink);
+          return { ...b, links: newLinks };
+        });
+        save(newState);
+      }
+    });
+  };
+
   const addLink = () => {
     if (!newUrl.trim()) return;
     const l = normalizeLink({ title: newTitle.trim(), url: newUrl.trim() });
@@ -285,8 +343,8 @@ function LinksManager({ box, state, save, openModal }) {
       <div class="links-list">
         ${links.map((link, idx) => html`
           <div class="link-item">
-            <i class="ph ph-link"></i>
-            <a href=${link.url} target="_blank" rel="noopener noreferrer">${link.title || link.url}</a>
+            <button class="icon-btn small" onClick=${() => editLink(idx)} title="Edit Link"><i class="ph ph-pencil-simple"></i></button>
+            <a href=${link.url} target="_blank" rel="noopener noreferrer" style=${{ flex: 1, marginLeft: '4px' }}>${link.title || link.url}</a>
             <button class="icon-btn danger small" onClick=${() => removeLink(idx)}><i class="ph ph-x"></i></button>
           </div>
         `)}

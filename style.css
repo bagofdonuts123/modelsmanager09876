@@ -34,6 +34,7 @@
    --shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
    --modal-overlay: rgba(0, 0, 0, 0.35);
    --primary-glow: rgba(99, 102, 241, 0.1);
+   --tag-text: #ffffff;
 }
 
 [data-theme="light"] input,
@@ -304,7 +305,8 @@ input[type="checkbox"] {
 }
 
 .category-item, .tag-item {
-   padding: 8px 12px;
+   padding: 8px 12px 8px 9px;
+   border-left: 3px solid transparent;
    border-radius: var(--radius);
    display: flex;
    justify-content: space-between;
@@ -329,18 +331,6 @@ input[type="checkbox"] {
 .category-item.drag-over {
    background: var(--bg-hover);
    outline: 1px dashed var(--primary);
-}
-
-/* Separator lines between categories */
-.category-item.with-separator {
-   border-bottom: 1px solid var(--border);
-   margin-bottom: 4px;
-   padding-bottom: 10px;
-}
-.category-item.with-separator:last-child {
-   border-bottom: none;
-   margin-bottom: 2px;
-   padding-bottom: 8px;
 }
 
 .category-name { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -507,24 +497,27 @@ input[type="checkbox"] {
 .card-tags-text {
    display: flex;
    flex-wrap: wrap;
-   gap: 6px 8px;
-   max-height: 18px;
+   gap: 4px;
+   max-height: 24px;
    overflow: hidden;
 }
 .card-tag-label {
-   font-size: 11px;
+   font-size: 10px;
    font-weight: 600;
-   line-height: 1;
+   line-height: 1.2;
    white-space: nowrap;
+   padding: 2px 6px;
+   border-radius: 8px;
+   color: var(--tag-text, #ffffff);
 }
 
 /* =========================================
    SCROLL BUTTONS
    ========================================= */
 .scroll-buttons {
-   position: absolute;
+   position: fixed;
    bottom: 20px;
-   right: 20px;
+   right: 360px;
    display: flex;
    flex-direction: column;
    gap: 8px;
@@ -702,7 +695,7 @@ input[type="checkbox"] {
    display: flex;
    align-items: center;
    gap: 6px;
-   color: white;
+   color: var(--tag-text, #ffffff);
 }
 .tag-pill button, .tag-badge button,
 .remove-tag {
@@ -930,5 +923,5 @@ input[type="checkbox"] {
       grid-template-rows: auto 1fr;
    }
    .sidebar, .info-panel { display: none; }
-   .scroll-buttons { right: 16px; bottom: 16px; }
+   .scroll-buttons { right: 20px; bottom: 20px; }
 }

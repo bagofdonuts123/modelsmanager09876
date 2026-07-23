@@ -1,5 +1,5 @@
 import { html, useState } from './lib.js';
-import { useTheme, useAuth, useAppState } from './store.js';
+import { useAuth, useAppState } from './store.js';
 
 export let dragSource = null;
 export function setDragSource(val) {
@@ -7,8 +7,6 @@ export function setDragSource(val) {
 }
 
 export function Sidebar() {
-  const { theme, setTheme } = useTheme();
-  const { logout } = useAuth();
   const {
     state,
     save,
@@ -20,6 +18,7 @@ export function Sidebar() {
     setSelectedBoxId,
     openModal
   } = useAppState();
+  const { logout } = useAuth();
 
   const [dragOverId, setDragOverId] = useState(null);
 
@@ -156,51 +155,24 @@ export function Sidebar() {
     setDragSource(null);
   };
 
-  const showSeparators = state.settings?.showCategorySeparators;
-
   return html`
     <aside class="sidebar">
-      <div class="sidebar-header">
-        <h2>Library</h2>
+      <header class="sidebar-header">
         <div class="header-actions">
-          <button class="action-btn" title="Add Category" onClick=${handleAddCategory}>
-            <i class="ph ph-plus"></i>
-          </button>
-          <button class="action-btn" title="Manage Tags" onClick=${() => openModal('tagManager')}>
-            <i class="ph ph-tag"></i>
-          </button>
-          <button class="action-btn" title="Settings" onClick=${() => openModal('settings')}>
+          <button class="icon-btn" title="Settings" onClick=${() => openModal('settings')}>
             <i class="ph ph-gear"></i>
           </button>
-          <button class="action-btn" title="Sign Out" onClick=${logout}>
+          <button class="icon-btn" title="Manage Tags" onClick=${() => openModal('tagManager')}>
+            <i class="ph ph-tag"></i>
+          </button>
+          <button class="icon-btn" title="Add Category" onClick=${handleAddCategory}>
+            <i class="ph ph-plus"></i>
+          </button>
+          <button class="icon-btn" title="Sign Out" onClick=${logout}>
             <i class="ph ph-sign-out"></i>
           </button>
         </div>
-      </div>
-
-      <div class="theme-toggle">
-        <button 
-          class="theme-btn ${theme === 'light' ? 'active' : ''}" 
-          onClick=${() => setTheme('light')}
-          title="Light Theme"
-        >
-          <i class="ph ph-sun"></i>
-        </button>
-        <button 
-          class="theme-btn ${theme === 'dark' ? 'active' : ''}" 
-          onClick=${() => setTheme('dark')}
-          title="Dark Theme"
-        >
-          <i class="ph ph-moon"></i>
-        </button>
-        <button 
-          class="theme-btn ${theme === 'system' ? 'active' : ''}" 
-          onClick=${() => setTheme('system')}
-          title="System Theme"
-        >
-          <i class="ph ph-monitor"></i>
-        </button>
-      </div>
+      </header>
 
       <div class="sidebar-section">
         <h3 class="section-title">CATEGORIES</h3>
@@ -216,8 +188,7 @@ export function Sidebar() {
               onClick=${() => handleCategoryClick(category.id)}
               class="category-item 
                 ${viewMode === 'category' && activeId === category.id ? 'active' : ''} 
-                ${dragOverId === category.id ? 'drag-over' : ''}
-                ${showSeparators ? 'with-separator' : ''}"
+                ${dragOverId === category.id ? 'drag-over' : ''}"
             >
               <span class="category-name">${category.name}</span>
               <div class="category-actions">

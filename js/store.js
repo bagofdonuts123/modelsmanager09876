@@ -82,7 +82,8 @@ const defaultState = {
          { name: "Google", url: "https://www.google.com/search?q={name}" },
          { name: "Twitter", url: "https://twitter.com/search?q={name}" }
       ],
-      showCategorySeparators: false
+      showCategorySeparators: false,
+      iconLibrary: []
    }
 };
 
@@ -230,9 +231,23 @@ export function updateBox(state, boxId, updater) {
    };
 }
 
-/** Get the active name for URL templates (falls back to box.name) */
+/** Get the active name for URL templates (checks nameHistory for 'active' state, falls back to box.activeName or box.name) */
 export function getActiveName(box) {
+   const history = box.nameHistory || [];
+   const activeEntry = history.find(h => h.state === 'active');
+   if (activeEntry) return activeEntry.name;
    return box.activeName || box.name;
+}
+
+/** Get the icon object for the active name, or null */
+export function getActiveIcon(settings, box) {
+   const history = box.nameHistory || [];
+   const activeEntry = history.find(h => h.state === 'active');
+   if (activeEntry && activeEntry.iconId) {
+      const icons = settings?.iconLibrary || [];
+      return icons.find(i => i.id === activeEntry.iconId) || null;
+   }
+   return null;
 }
 
 /** Parse bulk link lines into { title, url } objects */

@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback } from './lib.js';
-import { useAppState, useAuth, getTagObj, parseBulkLines, normalizeLink } from './store.js';
+import { useAppState, useAuth, useTheme, getTagObj, parseBulkLines, normalizeLink } from './store.js';
 
 export function ModalManager() {
   const { modal, closeModal } = useAppState();
@@ -31,9 +31,51 @@ function renderModalContent(type, props, closeModal) {
       return html`<${BulkAddModelsModal} ...${props} closeModal=${closeModal} />`;
     case 'bulkAddLinks':
       return html`<${BulkAddLinksModal} ...${props} closeModal=${closeModal} />`;
+    case 'editLink':
+      return html`<${EditLinkModal} ...${props} closeModal=${closeModal} />`;
     default:
       return html`<div>Unknown modal type: ${type}</div>`;
   }
+}
+
+function EditLinkModal({ title, url, onConfirm, closeModal }) {
+  const [newTitle, setNewTitle] = useState(title || '');
+  const [newUrl, setNewUrl] = useState(url || '');
+
+  const handleConfirm = () => {
+    onConfirm({ title: newTitle.trim(), url: newUrl.trim() });
+    closeModal();
+  };
+
+  return html`
+    <header class="modal-header">
+      <h2>Edit Link</h2>
+      <button class="icon-btn" onClick=${closeModal}><i class="ph ph-x"></i></button>
+    </header>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>Title (optional)</label>
+        <input 
+          type="text" 
+          value=${newTitle} 
+          onInput=${e => setNewTitle(e.target.value)}
+        />
+      </div>
+      <div class="form-group">
+        <label>URL</label>
+        <input 
+          type="text" 
+          value=${newUrl} 
+          onInput=${e => setNewUrl(e.target.value)}
+          onKeyDown=${e => e.key === 'Enter' && handleConfirm()}
+        />
+      </div>
+    </div>
+    <footer class="modal-footer">
+      <button class="btn secondary" onClick=${closeModal}>Cancel</button>
+      <button class="btn primary" onClick=${handleConfirm}>Save</button>
+    </footer>
+  `;
 }
 
 // --- Specific Modals ---
@@ -98,8 +140,10 @@ function ConfirmModal({ title, message, onConfirm, closeModal }) {
 
 function SettingsModal({ closeModal }) {
   const { state, save } = useAppState();
+  const { theme, setTheme } = useTheme();
   const [templates, setTemplates] = useState([...(state.settings?.searchTemplates || [])]);
-  const [showSeparators, setShowSeparators] = useState(!!state.settings?.showCategorySeparators);
+  const [icons, setIcons] = useState([...(state.settings?.iconLibrary || [])]);
+  const [newIconUrl, setNewIconUrl] = useState('');
 
   const handleSave = () => {
     const newState = {
@@ -107,7 +151,7 @@ function SettingsModal({ closeModal }) {
       settings: {
         ...(state.settings || {}),
         searchTemplates: templates.filter(t => t.name.trim() && t.url.trim()),
-        showCategorySeparators: showSeparators
+        iconLibrary: icons
       }
     };
     save(newState);
@@ -167,14 +211,14 @@ function SettingsModal({ closeModal }) {
       
       <div class="settings-section">
         <h3>Display</h3>
-        <label class="checkbox-label">
-          <input 
-            type="checkbox" 
-            checked=${showSeparators} 
-            onChange=${e => setShowSeparators(e.target.checked)} 
-          />
-          Show Category Separators
-        </label>
+        <div class="form-group">
+          <label>Theme</label>
+          <div class="theme-selector">
+             <button class="btn ${theme === 'light' ? 'primary' : 'secondary'}" onClick=${() => setTheme('light')}><i class="ph ph-sun"></i> Light</button>
+             <button class="btn ${theme === 'dark' ? 'primary' : 'secondary'}" onClick=${() => setTheme('dark')}><i class="ph ph-moon"></i> Dark</button>
+             <button class="btn ${theme === 'system' ? 'primary' : 'secondary'}" onClick=${() => setTheme('system')}><i class="ph ph-monitor"></i> System</button>
+          </div>
+        </div>
       </div>
 
       <div class="settings-section">
@@ -202,6 +246,32 @@ function SettingsModal({ closeModal }) {
           `)}
         </div>
         <button class="btn small" onClick=${addTemplate}>Add Template</button>
+      </div>
+
+      <div class="settings-section">
+        <h3>Icon Library</h3>
+        <p class="muted-text">Import icon images (e.g. from a URL) to associate with model names.</p>
+        <div class="icon-grid">
+           ${icons.map((ic, idx) => html`
+             <div class="icon-item">
+                <img src=${ic.url} alt="icon" style=${{ width: '32px', height: '32px', objectFit: 'contain' }} />
+                <button class="icon-btn danger small" onClick=${() => {
+                   const newIcons = [...icons];
+                   newIcons.splice(idx, 1);
+                   setIcons(newIcons);
+                }}><i class="ph ph-trash"></i></button>
+             </div>
+           `)}
+        </div>
+        <div class="add-icon-row" style=${{ display: 'flex', gap: '8px', marginTop: '10px' }}>
+           <input type="text" placeholder="Image URL" value=${newIconUrl} onInput=${e => setNewIconUrl(e.target.value)} />
+           <button class="btn" onClick=${() => {
+              if (newIconUrl.trim()) {
+                 setIcons([...icons, { id: 'ic_' + Date.now(), url: newIconUrl.trim() }]);
+                 setNewIconUrl('');
+              }
+           }}>Add Icon</button>
+        </div>
       </div>
 
       <div class="settings-section">

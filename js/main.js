@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback, memo } from './lib.js';
-import { useAppState, getTagObj, getActiveName } from './store.js';
+import { useAppState, getTagObj, getActiveName, getActiveIcon } from './store.js';
 import { dragSource, setDragSource } from './sidebar.js';
 
 export function TopBar() {
@@ -83,12 +83,17 @@ export function TopBar() {
   `;
 }
 
-export const BoxCard = memo(function BoxCard({ box, categoryId, isSelected, onSelect }) {
-  const { state, save } = useAppState();
+export const BoxCard = memo(function BoxCard({ box, categoryId }) {
+  const { state, activeId, save, setSelectedBoxId } = useAppState();
+  const isSelected = state.selectedBoxId === box.id;
+  
+  const activeName = getActiveName(box);
+  const activeIcon = getActiveIcon(state.settings, box);
 
   const handleDragStart = (e) => {
     setDragSource({ type: 'box', id: box.id, fromCatId: categoryId });
     e.dataTransfer.effectAllowed = 'move';
+    e.dataTransfer.setData('text/plain', box.id);
   };
 
   const handleDragOver = (e) => {
@@ -97,45 +102,49 @@ export const BoxCard = memo(function BoxCard({ box, categoryId, isSelected, onSe
 
   const handleDrop = (e) => {
     e.preventDefault();
-    if (dragSource?.type === 'box' && dragSource.fromCatId === categoryId && dragSource.id !== box.id) {
-      const cat = state.categories.find(c => c.id === categoryId);
-      if (!cat) return;
-      const newBoxes = [...cat.boxes];
-      const fromIdx = newBoxes.findIndex(b => b.id === dragSource.id);
-      const toIdx = newBoxes.findIndex(b => b.id === box.id);
-      if (fromIdx >= 0 && toIdx >= 0) {
-        const [moved] = newBoxes.splice(fromIdx, 1);
-        newBoxes.splice(toIdx, 0, moved);
-        const newState = {
-          ...state,
-          categories: state.categories.map(c => c.id === categoryId ? { ...c, boxes: newBoxes } : c)
-        };
-        save(newState);
-      }
-    }
+    if (!dragSource || dragSource.type !== 'box') return;
+    if (dragSource.fromCatId !== categoryId) return; 
+    
+    const newCategories = [...state.categories];
+    const catIdx = newCategories.findIndex(c => c.id === categoryId);
+    if (catIdx === -1) return;
+    
+    const cat = { ...newCategories[catIdx], boxes: [...newCategories[catIdx].boxes] };
+    const sourceBoxIdx = cat.boxes.findIndex(b => b.id === dragSource.id);
+    const targetBoxIdx = cat.boxes.findIndex(b => b.id === box.id);
+    
+    if (sourceBoxIdx === -1 || targetBoxIdx === -1 || sourceBoxIdx === targetBoxIdx) return;
+    
+    const [movedBox] = cat.boxes.splice(sourceBoxIdx, 1);
+    cat.boxes.splice(targetBoxIdx, 0, movedBox);
+    
+    newCategories[catIdx] = cat;
+    save({ ...state, categories: newCategories });
+    setDragSource(null);
   };
-
-  const placeholderSvg = "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='200' height='200'><rect width='200' height='200' fill='%23ccc'/><text x='50%' y='50%' dominant-baseline='middle' text-anchor='middle' font-family='sans-serif' font-size='20' fill='%23666'>No Image</text></svg>";
-
-  const activeName = getActiveName(box);
 
   return html`
     <div 
-      class="box ${isSelected ? 'selected' : ''}" 
-      onClick=${onSelect}
+      class="box ${isSelected ? 'selected' : ''}"
+      onClick=${() => setSelectedBoxId(box.id)}
       draggable="true"
       onDragStart=${handleDragStart}
       onDragOver=${handleDragOver}
       onDrop=${handleDrop}
     >
       <img 
-        src=${box.image || placeholderSvg} 
-        onError=${(e) => { e.target.src = placeholderSvg; }} 
-        alt=${activeName} 
-        loading="lazy"
+        src=${box.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%23333"/><text x="50%" y="50%" fill="%23666" dominant-baseline="middle" text-anchor="middle">No Image</text></svg>'} 
+        onError=${(e) => { 
+          e.target.onerror = null; 
+          e.target.src = 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="200" height="200"><rect width="200" height="200" fill="%23333"/><text x="50%" y="50%" fill="%23666" dominant-baseline="middle" text-anchor="middle">No Image</text></svg>';
+        }}
+        alt=${activeName}
       />
       <div class="box-info">
-        <h3>${activeName}</h3>
+        <h3 style=${{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+          ${activeIcon ? html`<img src=${activeIcon.url} style=${{ width: '16px', height: '16px', objectFit: 'contain' }} />` : null}
+          ${activeName}
+        </h3>
         <div class="card-tags-text">
           ${(box.tags || []).map(tagId => {
             const tag = getTagObj(state, tagId);
