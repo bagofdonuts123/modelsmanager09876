@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback } from './lib.js';
-import { useAppState, useAuth, useTheme, getTagObj, parseBulkLines, normalizeLink } from './store.js';
+import { useAppState, useAuth, useTheme, getTagObj, parseBulkLines, normalizeLink, findDuplicates, mergeBoxes, nameExistsGlobally, getActiveName } from './store.js';
 
 export function ModalManager() {
   const { modal, closeModal } = useAppState();
@@ -33,6 +33,10 @@ function renderModalContent(type, props, closeModal) {
       return html`<${BulkAddLinksModal} ...${props} closeModal=${closeModal} />`;
     case 'editLink':
       return html`<${EditLinkModal} ...${props} closeModal=${closeModal} />`;
+    case 'iconLibrary':
+      return html`<${IconLibraryModal} ...${props} closeModal=${closeModal} />`;
+    case 'duplicateScanner':
+      return html`<${DuplicateScannerModal} ...${props} closeModal=${closeModal} />`;
     default:
       return html`<div>Unknown modal type: ${type}</div>`;
   }
@@ -142,8 +146,6 @@ function SettingsModal({ closeModal }) {
   const { state, save } = useAppState();
   const { theme, setTheme } = useTheme();
   const [templates, setTemplates] = useState([...(state.settings?.searchTemplates || [])]);
-  const [icons, setIcons] = useState([...(state.settings?.iconLibrary || [])]);
-  const [newIconUrl, setNewIconUrl] = useState('');
   const [showCategorySeparators, setShowCategorySeparators] = useState(
     Boolean(state.settings?.showCategorySeparators)
   );
@@ -154,7 +156,6 @@ function SettingsModal({ closeModal }) {
       settings: {
         ...(state.settings || {}),
         searchTemplates: templates.filter(t => t.name.trim() && t.url.trim()),
-        iconLibrary: icons,
         showCategorySeparators
       }
     };
@@ -264,32 +265,6 @@ function SettingsModal({ closeModal }) {
       </div>
 
       <div class="settings-section">
-        <h3>Icon Library</h3>
-        <p class="muted-text">Import icon images (e.g. from a URL) to associate with model names.</p>
-        <div class="icon-grid">
-           ${icons.map((ic, idx) => html`
-             <div class="icon-item">
-                <img class="model-icon" src=${ic.url} alt="icon" style=${{ width: '32px', height: '32px', objectFit: 'contain' }} />
-                <button class="icon-btn danger small" onClick=${() => {
-                   const newIcons = [...icons];
-                   newIcons.splice(idx, 1);
-                   setIcons(newIcons);
-                }}><i class="ph ph-trash"></i></button>
-             </div>
-           `)}
-        </div>
-        <div class="add-icon-row" style=${{ display: 'flex', gap: '8px', marginTop: '10px' }}>
-           <input type="text" placeholder="Image URL" value=${newIconUrl} onInput=${e => setNewIconUrl(e.target.value)} />
-           <button class="btn" onClick=${() => {
-              if (newIconUrl.trim()) {
-                 setIcons([...icons, { id: 'ic_' + Date.now(), url: newIconUrl.trim() }]);
-                 setNewIconUrl('');
-              }
-           }}>Add Icon</button>
-        </div>
-      </div>
-
-      <div class="settings-section">
         <h3>Data Management</h3>
         <div class="data-actions">
           <button class="btn" onClick=${exportData}>Export Data</button>
@@ -304,6 +279,172 @@ function SettingsModal({ closeModal }) {
     <footer class="modal-footer">
       <button class="btn secondary" onClick=${closeModal}>Cancel</button>
       <button class="btn primary" onClick=${handleSave}>Save Settings</button>
+    </footer>
+  `;
+}
+
+function IconLibraryModal({ closeModal }) {
+  const { state, save } = useAppState();
+  const [icons, setIcons] = useState([...(state.settings?.iconLibrary || [])]);
+  const [newIconUrl, setNewIconUrl] = useState('');
+  const [newIconTemplate, setNewIconTemplate] = useState('');
+
+  const handleSave = () => {
+    const newState = {
+      ...state,
+      settings: {
+        ...(state.settings || {}),
+        iconLibrary: icons
+      }
+    };
+    save(newState);
+    closeModal();
+  };
+
+  const addIcon = () => {
+    if (!newIconUrl.trim()) return;
+    setIcons([...icons, { 
+      id: 'ic_' + Date.now(), 
+      url: newIconUrl.trim(),
+      urlTemplate: newIconTemplate.trim() || ''
+    }]);
+    setNewIconUrl('');
+    setNewIconTemplate('');
+  };
+
+  const removeIcon = (idx) => {
+    const newIcons = [...icons];
+    newIcons.splice(idx, 1);
+    setIcons(newIcons);
+  };
+
+  const updateIcon = (idx, field, value) => {
+    const newIcons = [...icons];
+    newIcons[idx] = { ...newIcons[idx], [field]: value };
+    setIcons(newIcons);
+  };
+
+  return html`
+    <header class="modal-header">
+      <h2>Icon Library</h2>
+      <button class="icon-btn" onClick=${closeModal}><i class="ph ph-x"></i></button>
+    </header>
+    <div class="modal-body">
+      <p class="muted-text">Manage icons and their URL templates. Use <code>{name}</code> in the URL template as a placeholder for the model name.</p>
+      
+      <div class="icon-library-list">
+        ${icons.map((ic, idx) => html`
+          <div class="icon-library-item">
+            <img class="model-icon" src=${ic.url} alt="icon" style=${{ width: '36px', height: '36px', objectFit: 'contain', borderRadius: '6px', border: '1px solid var(--border)' }} />
+            <div class="icon-library-fields">
+              <input 
+                type="text" 
+                placeholder="Icon image URL" 
+                value=${ic.url} 
+                onInput=${e => updateIcon(idx, 'url', e.target.value)} 
+              />
+              <input 
+                type="text" 
+                placeholder="URL template with {name}" 
+                value=${ic.urlTemplate || ''} 
+                onInput=${e => updateIcon(idx, 'urlTemplate', e.target.value)} 
+              />
+            </div>
+            <button class="icon-btn danger" onClick=${() => removeIcon(idx)}>
+              <i class="ph ph-trash"></i>
+            </button>
+          </div>
+        `)}
+      </div>
+
+      <div class="icon-library-add">
+        <input type="text" placeholder="Icon image URL" value=${newIconUrl} onInput=${e => setNewIconUrl(e.target.value)} />
+        <input type="text" placeholder="URL template (optional)" value=${newIconTemplate} onInput=${e => setNewIconTemplate(e.target.value)} />
+        <button class="btn" onClick=${addIcon}>Add Icon</button>
+      </div>
+    </div>
+    <footer class="modal-footer">
+      <button class="btn secondary" onClick=${closeModal}>Cancel</button>
+      <button class="btn primary" onClick=${handleSave}>Save</button>
+    </footer>
+  `;
+}
+
+function DuplicateScannerModal({ closeModal }) {
+  const { state, save } = useAppState();
+  const groups = findDuplicates(state);
+
+  const handleMerge = (keepBoxId, removeBoxId) => {
+    if (!confirm('Merge these models? Data from the removed model will be added to the kept model.')) return;
+    const newState = mergeBoxes(state, keepBoxId, removeBoxId);
+    save(newState);
+  };
+
+  const formatDate = (dateStr) => {
+    if (!dateStr) return 'Unknown';
+    try {
+      return new Date(dateStr).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+    } catch {
+      return 'Unknown';
+    }
+  };
+
+  return html`
+    <header class="modal-header">
+      <h2>Duplicate Scanner</h2>
+      <button class="icon-btn" onClick=${closeModal}><i class="ph ph-x"></i></button>
+    </header>
+    <div class="modal-body">
+      ${groups.length === 0 ? html`
+        <div class="empty-state" style=${{ textAlign: 'center', padding: '30px 0' }}>
+          <i class="ph ph-check-circle" style=${{ fontSize: '48px', color: 'var(--primary)', display: 'block', marginBottom: '12px' }}></i>
+          <p>No duplicates found!</p>
+        </div>
+      ` : html`
+        <p class="muted-text">Found ${groups.length} duplicate group${groups.length > 1 ? 's' : ''}. Select which model to keep — the other's data will be merged into it.</p>
+        <div class="duplicate-groups">
+          ${groups.map(group => html`
+            <div class="duplicate-group">
+              <div class="duplicate-group-header">
+                <i class="ph ph-warning" style=${{ color: 'var(--warning, #f59e0b)' }}></i>
+                <span>Shared name: <strong>"${group.sharedName}"</strong></span>
+              </div>
+              <div class="duplicate-group-entries">
+                ${group.entries.map(entry => html`
+                  <div class="duplicate-entry">
+                    <div class="duplicate-entry-info">
+                      <img 
+                        src=${entry.box.image || 'data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="40" height="40"><rect width="40" height="40" fill="%23333"/></svg>'} 
+                        alt="" 
+                        class="duplicate-entry-thumb" 
+                      />
+                      <div>
+                        <div class="duplicate-entry-name">${getActiveName(entry.box)}</div>
+                        <div class="muted-text" style=${{ fontSize: '11px' }}>in ${entry.category.name} · Created: ${formatDate(entry.box.dateCreated)}</div>
+                        <div class="muted-text" style=${{ fontSize: '11px' }}>${(entry.box.nameHistory || []).length} names · ${(entry.box.tags || []).length} tags · ${(entry.box.links || []).length} links</div>
+                      </div>
+                    </div>
+                    <div class="duplicate-entry-actions">
+                      ${group.entries.filter(other => other.box.id !== entry.box.id).map(other => html`
+                        <button 
+                          class="btn small" 
+                          onClick=${() => handleMerge(entry.box.id, other.box.id)}
+                          title=${`Keep this model and merge data from "${getActiveName(other.box)}"`}
+                        >
+                          Keep this
+                        </button>
+                      `)}
+                    </div>
+                  </div>
+                `)}
+              </div>
+            </div>
+          `)}
+        </div>
+      `}
+    </div>
+    <footer class="modal-footer">
+      <button class="btn primary" onClick=${closeModal}>Done</button>
     </footer>
   `;
 }
@@ -435,8 +576,18 @@ function BulkAddModelsModal({ closeModal }) {
 
     setLoading(true);
     const newBoxes = [];
+    const skipped = [];
 
-    for (const name of lines) {
+    for (const rawName of lines) {
+      const name = rawName.trim();
+      if (!name) continue;
+      
+      const existing = nameExistsGlobally(state, name);
+      if (existing) {
+        skipped.push(`${name} (exists in "${existing.category.name}")`);
+        continue;
+      }
+
       let image = '';
       try {
         const res = await fetch(`https://api.camgirlfinder.net/models/search?model=${encodeURIComponent(name)}`);
@@ -455,19 +606,27 @@ function BulkAddModelsModal({ closeModal }) {
         image,
         tags: [],
         links: [],
-        nameHistory: []
+        nameHistory: [],
+        dateCreated: new Date().toISOString()
       });
     }
 
-    const newState = {
-      ...state,
-      categories: state.categories.map(c => 
-        c.id === activeId ? { ...c, boxes: [...(c.boxes || []), ...newBoxes] } : c
-      )
-    };
-    
-    save(newState);
+    if (newBoxes.length > 0) {
+      const newState = {
+        ...state,
+        categories: state.categories.map(c => 
+          c.id === activeId ? { ...c, boxes: [...(c.boxes || []), ...newBoxes] } : c
+        )
+      };
+      save(newState);
+    }
+
     setLoading(false);
+    
+    if (skipped.length > 0) {
+      alert(`Skipped ${skipped.length} duplicate(s):\n${skipped.join('\n')}`);
+    }
+    
     closeModal();
   };
 

@@ -1,4 +1,4 @@
-import { html, useState } from './lib.js';
+import { html, useState, useEffect, useRef } from './lib.js';
 import { useAuth, useAppState } from './store.js';
 
 export let dragSource = null;
@@ -21,6 +21,38 @@ export function Sidebar() {
   const { logout } = useAuth();
 
   const [dragOverId, setDragOverId] = useState(null);
+
+  const [splitRatio, setSplitRatio] = useState(() => {
+    const saved = localStorage.getItem('sidebar-split-ratio');
+    return saved ? parseFloat(saved) : 0.65;
+  });
+
+  useEffect(() => {
+    localStorage.setItem('sidebar-split-ratio', splitRatio.toString());
+  }, [splitRatio]);
+
+  const handleResizeStart = (e) => {
+    e.preventDefault();
+    const startY = e.clientY;
+    const container = e.target.parentElement;
+    const containerRect = container.getBoundingClientRect();
+    const startRatio = splitRatio;
+
+    const onMouseMove = (moveE) => {
+      const deltaY = moveE.clientY - startY;
+      const newRatio = Math.max(0.15, Math.min(0.85, startRatio + deltaY / containerRect.height));
+      setSplitRatio(newRatio);
+    };
+
+    const onMouseUp = () => {
+      document.removeEventListener('mousemove', onMouseMove);
+      document.removeEventListener('mouseup', onMouseUp);
+      localStorage.setItem('sidebar-split-ratio', splitRatio.toString());
+    };
+
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  };
 
   const handleCategoryClick = (id) => {
     setViewMode('category');
@@ -165,6 +197,12 @@ export function Sidebar() {
           <button class="icon-btn" title="Manage Tags" onClick=${() => openModal('tagManager')}>
             <i class="ph ph-tag"></i>
           </button>
+          <button class="icon-btn" title="Icon Library" onClick=${() => openModal('iconLibrary')}>
+            <i class="ph ph-images-square"></i>
+          </button>
+          <button class="icon-btn" title="Find Duplicates" onClick=${() => openModal('duplicateScanner')}>
+            <i class="ph ph-copy-simple"></i>
+          </button>
           <button class="icon-btn" title="Add Category" onClick=${handleAddCategory}>
             <i class="ph ph-plus"></i>
           </button>
@@ -174,7 +212,8 @@ export function Sidebar() {
         </div>
       </header>
 
-      <div class="sidebar-section">
+      <div class="sidebar-sections-container" style=${{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minHeight: 0 }}>
+        <div class="sidebar-section" style=${{ flex: splitRatio, overflow: 'auto', minHeight: '60px' }}>
         <h3 class="section-title">CATEGORIES</h3>
         <ul class="category-list ${state.settings?.showCategorySeparators ? 'show-separators' : ''}">
           ${(state.categories || []).map((category, index) => html`
@@ -202,10 +241,12 @@ export function Sidebar() {
             </li>
           `)}
         </ul>
-      </div>
-
-      <div class="sidebar-section">
-        <h3 class="section-title">TAGS</h3>
+        </div>
+        <div class="sidebar-resize-handle" onMouseDown=${handleResizeStart}>
+          <div class="resize-handle-line"></div>
+        </div>
+        <div class="sidebar-section" style=${{ flex: 1 - splitRatio, overflow: 'auto', minHeight: '60px' }}>
+          <h3 class="section-title">TAGS</h3>
         <ul class="tag-list">
           ${(state.tags || []).map(tag => html`
             <li 
@@ -218,6 +259,7 @@ export function Sidebar() {
             </li>
           `)}
         </ul>
+        </div>
       </div>
     </aside>
   `;

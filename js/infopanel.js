@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback } from './lib.js';
-import { useAppState, findBox, getTagObj, normalizeLink, updateBox, getActiveName, getActiveIcon, getContrastTextColor } from './store.js';
+import { useAppState, findBox, getTagObj, normalizeLink, updateBox, getActiveName, getActiveIcon, getContrastTextColor, nameExistsGlobally } from './store.js';
 
 export function InfoPanel() {
   const { state, save, selectedBoxId, setSelectedBoxId, openModal } = useAppState();
@@ -35,6 +35,22 @@ export function InfoPanel() {
     if (nameEditValue.trim() && nameEditValue !== box.name) {
       const oldName = box.name;
       const newName = nameEditValue.trim();
+
+      // Block duplicate names within this model's history
+      const existsInHistory = (box.nameHistory || []).some(h => h.name.trim().toLowerCase() === newName.toLowerCase());
+      if (existsInHistory && newName.toLowerCase() !== oldName.toLowerCase()) {
+        alert(`The name "${newName}" already exists in this model's name history.`);
+        setIsEditingName(false);
+        return;
+      }
+      // Block if name exists globally in another model
+      const globalExists = nameExistsGlobally(state, newName, box.id);
+      if (globalExists) {
+        alert(`The name "${newName}" already exists in category "${globalExists.category.name}" (model: "${globalExists.box.name}").`);
+        setIsEditingName(false);
+        return;
+      }
+
       const newHistory = [...(box.nameHistory || [])];
       
       const oldEntryIndex = newHistory.findIndex(h => h.name === oldName);
@@ -121,7 +137,7 @@ export function InfoPanel() {
             ` : html`
               <h2 style=${{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                 ${getActiveIcon(state.settings, box) ? html`<img class="model-icon" src=${getActiveIcon(state.settings, box).url} alt="" style=${{ width: '24px', height: '24px', objectFit: 'contain' }} />` : null}
-                ${box.name}
+                ${getActiveName(box)}
               </h2>
               <button class="icon-btn" onClick=${startEditName} title="Edit Name">
                 <i class="ph ph-pencil-simple"></i>
@@ -236,7 +252,7 @@ function ModelNameManager({ box, state, save }) {
     save(newState);
   };
 
-  const setActiveName = (nameToActivate) => {
+  const setActiveNameHandler = (nameToActivate) => {
     let newHistory = (box.nameHistory || []).map(h => ({
       ...h,
       state: getOperationalState(h),
@@ -247,7 +263,7 @@ function ModelNameManager({ box, state, save }) {
     if (existingIdx >= 0) {
       newHistory[existingIdx] = { ...newHistory[existingIdx], active: true };
     } else {
-      newHistory.push({ name: nameToActivate, state: 'stopped', active: true });
+      newHistory.push({ name: nameToActivate, state: 'running', active: true });
     }
 
     const newState = updateBox(state, box.id, b => ({
@@ -256,6 +272,54 @@ function ModelNameManager({ box, state, save }) {
       activeName: nameToActivate
     }));
     save(newState);
+  };
+
+  const deleteName = (nameToDelete) => {
+    // Cannot delete if it's the primary name and no other names exist
+    if (nameToDelete === box.name && allNames.length <= 1) {
+      alert('Cannot delete the only name.');
+      return;
+    }
+    
+    let newHistory = (box.nameHistory || []).filter(h => h.name !== nameToDelete);
+    
+    // If deleted entry was active, activate the first remaining or box.name
+    const wasActive = allNames.find(e => e.name === nameToDelete);
+    if (wasActive && (wasActive.active === true || wasActive.state === 'active' || (!hasExplicitActive && activeName === nameToDelete))) {
+      // Find first remaining name to activate
+      const firstRemaining = newHistory[0];
+      if (firstRemaining) {
+        newHistory = newHistory.map((h, i) => ({ ...h, active: i === 0 }));
+      }
+      // If deleting from history but it's not box.name, just ensure box.name entry is active
+      if (nameToDelete !== box.name) {
+        const boxNameIdx = newHistory.findIndex(h => h.name === box.name);
+        if (boxNameIdx >= 0) {
+          newHistory = newHistory.map(h => ({ ...h, active: h.name === box.name }));
+        }
+      }
+    }
+
+    let updates = { nameHistory: newHistory };
+    // If we're deleting box.name itself, promote the first history entry to be box.name
+    if (nameToDelete === box.name && newHistory.length > 0) {
+      const promoted = newHistory[0];
+      updates.name = promoted.name;
+      updates.activeName = promoted.name;
+      newHistory[0] = { ...newHistory[0], active: true };
+      updates.nameHistory = newHistory;
+    }
+    
+    const newState = updateBox(state, box.id, b => ({ ...b, ...updates }));
+    save(newState);
+  };
+
+  const handleSearchWithIcon = (entry) => {
+    if (!entry.iconId) return;
+    const icon = icons.find(i => i.id === entry.iconId);
+    if (!icon || !icon.urlTemplate) return;
+    const url = icon.urlTemplate.replace('{name}', encodeURIComponent(entry.name));
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   return html`
@@ -268,35 +332,57 @@ function ModelNameManager({ box, state, save }) {
             entry.state === 'active' ||
             (!hasExplicitActive && activeName === entry.name);
           const operationalState = getOperationalState(entry);
+          const entryIcon = entry.iconId ? icons.find(i => i.id === entry.iconId) : null;
+          const hasSearchUrl = entryIcon && entryIcon.urlTemplate;
           return html`
             <div class="name-entry ${isActuallyActive ? 'is-active' : ''}">
-              <${IconPicker} 
-                selectedId=${entry.iconId} 
-                icons=${icons} 
-                onChange=${id => updateHistory(entry.name, { iconId: id })} 
-              />
-              <span class="name-text" style=${{ flex: 1 }}>${entry.name}</span>
-              <select 
-                class="name-state-select state-${operationalState}"
-                value=${operationalState}
-                onChange=${e => updateHistory(entry.name, { state: e.target.value })}
-                aria-label=${`State for ${entry.name}`}
-              >
-                <option value="running">Running</option>
-                <option value="stopped">Stopped</option>
-              </select>
-              <button
-                type="button"
-                class="active-toggle ${isActuallyActive ? 'is-on' : ''}"
-                role="switch"
-                aria-checked=${isActuallyActive}
-                aria-label=${`${isActuallyActive ? 'Active' : 'Use'} ${entry.name} for display and URL templates`}
-                title=${isActuallyActive ? 'Used for display and URL templates' : 'Use for display and URL templates'}
-                onClick=${() => !isActuallyActive && setActiveName(entry.name)}
-              >
-                <span class="active-toggle-track"><span></span></span>
-                <span>Active</span>
-              </button>
+              <div class="name-entry-icon">
+                <${IconPicker} 
+                  selectedId=${entry.iconId} 
+                  icons=${icons} 
+                  onChange=${id => updateHistory(entry.name, { iconId: id })} 
+                />
+              </div>
+              <div class="name-entry-top">
+                <span class="name-text">${entry.name}</span>
+                <button 
+                  class="icon-btn small name-entry-search-btn" 
+                  onClick=${() => handleSearchWithIcon(entry)}
+                  disabled=${!hasSearchUrl}
+                  title=${hasSearchUrl ? 'Search with icon template' : 'No URL template set for this icon'}
+                >
+                  <i class="ph ph-magnifying-glass"></i>
+                </button>
+              </div>
+              <div class="name-entry-bottom">
+                <select 
+                  class="name-state-select state-${operationalState}"
+                  value=${operationalState}
+                  onChange=${e => updateHistory(entry.name, { state: e.target.value })}
+                  aria-label=${`State for ${entry.name}`}
+                >
+                  <option value="running">Running</option>
+                  <option value="stopped">Stopped</option>
+                </select>
+                <button
+                  type="button"
+                  class="active-toggle ${isActuallyActive ? 'is-on' : ''}"
+                  role="switch"
+                  aria-checked=${isActuallyActive}
+                  title=${isActuallyActive ? 'Currently active' : 'Set as active'}
+                  onClick=${() => !isActuallyActive && setActiveNameHandler(entry.name)}
+                >
+                  <span class="active-toggle-track"><span></span></span>
+                  <span>Active</span>
+                </button>
+                <button 
+                  class="icon-btn danger small" 
+                  onClick=${() => deleteName(entry.name)}
+                  title="Delete this name"
+                >
+                  <i class="ph ph-trash"></i>
+                </button>
+              </div>
             </div>
           `;
         })}

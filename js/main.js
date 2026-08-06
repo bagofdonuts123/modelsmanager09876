@@ -1,5 +1,5 @@
 import { html, useState, useEffect, useRef, useCallback, memo } from './lib.js';
-import { useAppState, getTagObj, getActiveName, getActiveIcon, getContrastTextColor } from './store.js';
+import { useAppState, getTagObj, getActiveName, getActiveIcon, getContrastTextColor, nameExistsGlobally } from './store.js';
 import { dragSource, setDragSource } from './sidebar.js';
 
 export function TopBar() {
@@ -43,8 +43,17 @@ export function TopBar() {
     }
   };
 
-  async function handleAddBox(name) {
+  async function handleAddBox(rawName) {
+    const name = (rawName || '').trim();
+    if (!name) return;
     if (viewMode !== 'category' || !activeId) { alert('Select a category first.'); return; }
+    
+    const existing = nameExistsGlobally(state, name);
+    if (existing) {
+      alert(`A model with the name "${name}" already exists in category "${existing.category.name}" (model: "${existing.box.name}").`);
+      return;
+    }
+    
     let image = '';
     try {
       const res = await fetch(`https://api.camgirlfinder.net/models/search?model=${encodeURIComponent(name)}`);
@@ -53,11 +62,10 @@ export function TopBar() {
          image = json[0].persons[0].urls.faceImage;
       }
     } catch(e) { console.error('API Error', e); }
-    const cat = state.categories.find(c => c.id === activeId);
     const newState = {
       ...state,
       categories: state.categories.map(c => c.id === activeId
-         ? { ...c, boxes: [...c.boxes, { id: crypto.randomUUID(), name, image, tags: [], links: [] }] }
+         ? { ...c, boxes: [...c.boxes, { id: crypto.randomUUID(), name, image, tags: [], links: [], nameHistory: [], dateCreated: new Date().toISOString() }] }
          : c
       )
     };

@@ -132,6 +132,7 @@ export function AppStateProvider({ children }) {
             s = JSON.parse(JSON.stringify(defaultState));
             ref.set({ payload: s });
          }
+         s = trimAllNames(s);
          setStateRaw(s);
          stateRef.current = s;
 
@@ -260,6 +261,146 @@ export function getContrastTextColor(color) {
    const b = parseInt(hex.slice(4, 6), 16);
    const luminance = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
    return luminance > 0.62 ? '#111111' : '#ffffff';
+}
+
+/** Trim leading/trailing whitespace from all name fields across the entire state */
+export function trimAllNames(state) {
+   return {
+      ...state,
+      categories: (state.categories || []).map(c => ({
+         ...c,
+         boxes: (c.boxes || []).map(b => ({
+            ...b,
+            name: (b.name || '').trim(),
+            activeName: (b.activeName || '').trim(),
+            nameHistory: (b.nameHistory || []).map(h => ({
+               ...h,
+               name: (h.name || '').trim()
+            }))
+         }))
+      }))
+   };
+}
+
+/** Check if a name already exists globally across any model's name, activeName, or nameHistory.
+ *  excludeBoxId lets you skip a specific box (e.g., the one being renamed). */
+export function nameExistsGlobally(state, name, excludeBoxId) {
+   const needle = (name || '').trim().toLowerCase();
+   if (!needle) return null;
+   for (const cat of (state.categories || [])) {
+      for (const box of (cat.boxes || [])) {
+         if (excludeBoxId && box.id === excludeBoxId) continue;
+         const names = [
+            (box.name || '').trim().toLowerCase(),
+            (box.activeName || '').trim().toLowerCase(),
+            ...(box.nameHistory || []).map(h => (h.name || '').trim().toLowerCase())
+         ];
+         if (names.includes(needle)) {
+            return { box, category: cat };
+         }
+      }
+   }
+   return null;
+}
+
+/** Find duplicate models — models that share a name (including through nameHistory) */
+export function findDuplicates(state) {
+   // Build index: normalized name → [{ box, category }]
+   const nameIndex = {};
+   for (const cat of (state.categories || [])) {
+      for (const box of (cat.boxes || [])) {
+         const allNames = new Set();
+         allNames.add((box.name || '').trim().toLowerCase());
+         if (box.activeName) allNames.add(box.activeName.trim().toLowerCase());
+         for (const h of (box.nameHistory || [])) {
+            if (h.name) allNames.add(h.name.trim().toLowerCase());
+         }
+         for (const n of allNames) {
+            if (!n) continue;
+            if (!nameIndex[n]) nameIndex[n] = [];
+            // Avoid adding same box twice under same name
+            if (!nameIndex[n].some(e => e.box.id === box.id)) {
+               nameIndex[n].push({ box, category: cat });
+            }
+         }
+      }
+   }
+   // Group: find names that appear in multiple boxes
+   const groups = [];
+   const seenPairs = new Set();
+   for (const [name, entries] of Object.entries(nameIndex)) {
+      if (entries.length < 2) continue;
+      // Create a unique key for the set of box IDs to avoid duplicate groups
+      const boxIds = entries.map(e => e.box.id).sort().join(',');
+      if (seenPairs.has(boxIds)) continue;
+      seenPairs.add(boxIds);
+      groups.push({ sharedName: name, entries });
+   }
+   return groups;
+}
+
+/** Merge box B into box A: add B's links, tags, and nameHistory into A, then delete B */
+export function mergeBoxes(state, keepBoxId, removeBoxId) {
+   const keepResult = findBox(state, keepBoxId);
+   const removeResult = findBox(state, removeBoxId);
+   if (!keepResult.box || !removeResult.box) return state;
+
+   const keepBox = keepResult.box;
+   const removeBox = removeResult.box;
+
+   // Merge tags (add missing)
+   const mergedTags = [...(keepBox.tags || [])];
+   for (const tid of (removeBox.tags || [])) {
+      if (!mergedTags.includes(tid)) mergedTags.push(tid);
+   }
+
+   // Merge links (add links whose URL doesn't already exist)
+   const mergedLinks = [...(keepBox.links || [])];
+   const existingUrls = new Set(mergedLinks.map(l => (typeof l === 'string' ? l : l.url || '').toLowerCase()));
+   for (const link of (removeBox.links || [])) {
+      const url = (typeof link === 'string' ? link : link.url || '').toLowerCase();
+      if (!existingUrls.has(url)) {
+         mergedLinks.push(link);
+         existingUrls.add(url);
+      }
+   }
+
+   // Merge nameHistory (add names that don't already exist)
+   const mergedHistory = [...(keepBox.nameHistory || [])];
+   const existingNames = new Set(mergedHistory.map(h => (h.name || '').trim().toLowerCase()));
+   // Also include box.name
+   existingNames.add((keepBox.name || '').trim().toLowerCase());
+   for (const h of (removeBox.nameHistory || [])) {
+      const normalized = (h.name || '').trim().toLowerCase();
+      if (normalized && !existingNames.has(normalized)) {
+         mergedHistory.push({ ...h, active: false });
+         existingNames.add(normalized);
+      }
+   }
+   // Also add removeBox.name if not present
+   const removeName = (removeBox.name || '').trim().toLowerCase();
+   if (removeName && !existingNames.has(removeName)) {
+      mergedHistory.push({ name: removeBox.name.trim(), state: 'stopped', active: false });
+   }
+
+   // Update kept box
+   let newState = updateBox(state, keepBoxId, b => ({
+      ...b,
+      tags: mergedTags,
+      links: mergedLinks,
+      nameHistory: mergedHistory
+   }));
+
+   // Remove the other box
+   newState = {
+      ...newState,
+      categories: newState.categories.map(c => ({
+         ...c,
+         boxes: c.boxes.filter(b => b.id !== removeBoxId)
+      }))
+   };
+
+   return newState;
 }
 
 /** Parse bulk link lines into { title, url } objects */
