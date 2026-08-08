@@ -319,7 +319,13 @@ function ModelNameManager({ box, state, save }) {
     const icon = icons.find(i => i.id === entry.iconId);
     if (!icon || !icon.urlTemplate) return;
     const url = icon.urlTemplate.replace('{name}', encodeURIComponent(entry.name));
-    window.open(url, '_blank', 'noopener,noreferrer');
+    const a = document.createElement('a');
+    a.href = url;
+    a.target = '_blank';
+    a.rel = 'noopener noreferrer';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
   };
 
   return html`
