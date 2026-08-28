@@ -11,7 +11,7 @@ import { TopBar, BoxGrid } from './main.js';
 import { InfoPanel } from './infopanel.js';
 import { ModalManager } from './modals.js';
 
-/* ─── Login Screen ─────────────────────────── */
+/* ─── Login Screen ──────────────────────── */
 function LoginScreen() {
    const { login } = useAuth();
    const [email, setEmail] = useState('');
