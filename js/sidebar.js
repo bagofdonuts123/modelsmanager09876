@@ -15,6 +15,7 @@ export function Sidebar() {
     activeId,
     setActiveId,
     setSearchText,
+    setLinkSearchText,
     setSelectedBoxId,
     openModal
   } = useAppState();
@@ -58,6 +59,7 @@ export function Sidebar() {
     setViewMode('category');
     setActiveId(id);
     setSearchText('');
+    setLinkSearchText('');
     setSelectedBoxId(null);
   };
 
@@ -65,6 +67,7 @@ export function Sidebar() {
     setViewMode('tag');
     setActiveId(id);
     setSearchText('');
+    setLinkSearchText('');
     setSelectedBoxId(null);
   };
 

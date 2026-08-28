@@ -100,6 +100,7 @@ export function AppStateProvider({ children }) {
    const [activeId, setActiveId] = useState(null);
    const [selectedBoxId, setSelectedBoxId] = useState(null);
    const [searchText, setSearchText] = useState('');
+   const [linkSearchText, setLinkSearchText] = useState('');
 
    /* Modal */
    const [modal, setModal] = useState(null);
@@ -188,6 +189,7 @@ export function AppStateProvider({ children }) {
       activeId, setActiveId,
       selectedBoxId, setSelectedBoxId,
       searchText, setSearchText,
+      linkSearchText, setLinkSearchText,
       modal, openModal, closeModal,
       scrollRef, preSearchState
    };

@@ -3,7 +3,7 @@ import { useAppState, getTagObj, getActiveName, getActiveIcon, getContrastTextCo
 import { dragSource, setDragSource } from './sidebar.js';
 
 export function TopBar() {
-  const { state, viewMode, setViewMode, activeId, setActiveId, searchText, setSearchText, openModal, save, preSearchState, scrollRef } = useAppState();
+  const { state, viewMode, setViewMode, activeId, setActiveId, searchText, setSearchText, linkSearchText, setLinkSearchText, openModal, save, preSearchState, scrollRef } = useAppState();
 
   let title = 'Main View';
   let count = 0;
@@ -19,18 +19,51 @@ export function TopBar() {
   } else if (viewMode === 'search') {
     title = `Search: "${searchText}"`;
     count = state.categories.flatMap(c => c.boxes).filter(b => getActiveName(b).toLowerCase().includes(searchText.toLowerCase())).length;
+  } else if (viewMode === 'linkSearch') {
+    title = `Link Search: "${linkSearchText}"`;
+    const term = linkSearchText.toLowerCase();
+    count = state.categories.flatMap(c => c.boxes).filter(b => 
+      (b.links || []).some(l => {
+        const t = typeof l === 'string' ? '' : (l.title || '');
+        return t.toLowerCase().includes(term);
+      })
+    ).length;
   }
 
   const handleSearchChange = (e) => {
     const val = e.target.value;
     if (val) {
-      if (!searchText) {
+      if (viewMode !== 'search' && viewMode !== 'linkSearch') {
         preSearchState.current = { categoryId: activeId, scrollTop: scrollRef.current?.scrollTop || 0 };
-        setViewMode('search');
       }
+      setViewMode('search');
       setSearchText(val);
+      setLinkSearchText('');
     } else {
       setSearchText('');
+      if (preSearchState.current) {
+        setViewMode('category');
+        setActiveId(preSearchState.current.categoryId);
+        setTimeout(() => {
+          if (scrollRef.current) scrollRef.current.scrollTop = preSearchState.current.scrollTop;
+        }, 0);
+      } else {
+        setViewMode('category');
+      }
+    }
+  };
+
+  const handleLinkSearchChange = (e) => {
+    const val = e.target.value;
+    if (val) {
+      if (viewMode !== 'search' && viewMode !== 'linkSearch') {
+        preSearchState.current = { categoryId: activeId, scrollTop: scrollRef.current?.scrollTop || 0 };
+      }
+      setViewMode('linkSearch');
+      setLinkSearchText(val);
+      setSearchText('');
+    } else {
+      setLinkSearchText('');
       if (preSearchState.current) {
         setViewMode('category');
         setActiveId(preSearchState.current.categoryId);
@@ -81,6 +114,10 @@ export function TopBar() {
         <div class="search-box">
           <i class="ph ph-magnifying-glass"></i>
           <input type="text" placeholder="Search..." value=${searchText} onInput=${handleSearchChange} />
+        </div>
+        <div class="search-box">
+          <i class="ph ph-link"></i>
+          <input type="text" placeholder="Search link titles..." value=${linkSearchText} onInput=${handleLinkSearchChange} />
         </div>
         <button class="btn" onClick=${() => openModal('bulkAddModels')}>Bulk Add</button>
         ${viewMode === 'category' ? html`
@@ -206,7 +243,7 @@ export function ScrollButtons() {
 }
 
 export function BoxGrid() {
-  const { state, viewMode, activeId, searchText, selectedBoxId, setSelectedBoxId, scrollRef } = useAppState();
+  const { state, viewMode, activeId, searchText, linkSearchText, selectedBoxId, setSelectedBoxId, scrollRef } = useAppState();
 
   useEffect(() => {
     const handleScroll = () => {
@@ -254,6 +291,19 @@ export function BoxGrid() {
     state.categories.forEach(c => {
       c.boxes.forEach(b => {
         if (getActiveName(b).toLowerCase().includes(term)) {
+          boxesToRender.push({ box: b, categoryId: c.id });
+        }
+      });
+    });
+  } else if (viewMode === 'linkSearch') {
+    const term = linkSearchText.toLowerCase();
+    state.categories.forEach(c => {
+      c.boxes.forEach(b => {
+        const hasMatchingLink = (b.links || []).some(l => {
+          const t = typeof l === 'string' ? '' : (l.title || '');
+          return t.toLowerCase().includes(term);
+        });
+        if (hasMatchingLink) {
           boxesToRender.push({ box: b, categoryId: c.id });
         }
       });
